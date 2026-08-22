@@ -198,6 +198,9 @@ time. Do not call it inside a loop.
 
 ```python
 def insert_at(self, index, value):
+    if index < 0:
+        raise IndexError('index cannot be negative')
+
     new_node = Node(value)
 
     if index == 0:
@@ -210,6 +213,10 @@ def insert_at(self, index, value):
         if current is None:
             raise IndexError('index out of range')
         current = current.next
+
+    if current is None:
+        raise IndexError('index out of range')
+
     new_node.next = current.next
     current.next = new_node
 ```
@@ -224,12 +231,33 @@ correct: `head` is the node before position 1.
 
 Pointer work is the two lines analysed above, in that order.
 
+### Both `None` checks are needed
+
+They catch different things and neither replaces the other.
+
+- The one **inside** the loop stops `current = current.next` from being run on
+  `None` while still walking.
+- The one **after** the loop catches the case where the *final* advance is what
+  produced `None`. The loop has already exited at that point, so the inner
+  check never sees it.
+
+Drop the second and `insert_at(4, x)` on a three element list reaches
+`new_node.next = current.next` holding `None` and dies with `AttributeError`
+instead of a meaningful `IndexError`.
+
+Valid positions are `0` through `n` inclusive — inserting at `n` is an append,
+which is why `insert_at(3, x)` on a three element list is legal and
+`insert_at(4, x)` is not.
+
 O(n) to walk, O(1) to splice.
 
 ## remove_at
 
 ```python
 def remove_at(self, index):
+    if index < 0:
+        raise IndexError("index cannot be negative")
+
     if self.head is None:
         raise IndexError("cannot delete from empty list")
 
@@ -266,6 +294,16 @@ instead of a meaningful `IndexError`.
 Note `remove_at` never allocates. Nothing dangling is created; the concern here
 is the orphan, described above.
 
+### Why both methods guard against negative indices
+
+`range(index - 1)` is **empty** for any negative `index`, not an error. Without
+the guard the loop simply never runs, `current` stays at `head`, and the
+operation quietly succeeds at position 1. `insert_at(-5, 'x')` on `1->2->3`
+gives `1->x->2->3`. No exception, just a wrong list. Python's own negative
+indexing convention does not come along for free here — if you want
+`remove_at(-1)` to mean the last element, that is separate code you have to
+write.
+
 ## reverse
 
 ```python
@@ -277,7 +315,7 @@ def reverse(self):
         current.next = prev
         prev = current
         current = next_node
-    return prev
+    self.head = prev
 ```
 
 Three pointers, and the order of the four lines is not negotiable.
@@ -316,45 +354,62 @@ now is the *tail* of the reversed portion and points at `None`. Calling
 `print()` or `count()` at that moment reports a list of length 1. The list is
 only whole again when the loop finishes.
 
-### The return value is a trap
+### Why the last line matters
 
-`reverse` returns the new head instead of assigning it, so the caller must
-write it back:
+`self.head = prev` is not bookkeeping, it is the step that makes the reversal
+real. Everything before it rearranged `next` pointers; until `head` moves, the
+list still starts at the old first node.
+
+That node is now the *last* node, with `next = None`. So dropping the final
+assignment leaves a list that silently reports one element. Nothing raises,
+nothing is lost — every node is still in memory, just unreachable. This is the
+same failure as forgetting to reattach a dangling node, arriving from the other
+direction: correct nodes, wrong entry point.
+
+The earlier version of this method ended in `return prev` and made the caller
+write `ll.head = ll.reverse()`. That works, but it puts the critical step
+outside the method where it can be forgotten. Mutating in place removes the
+footgun:
 
 ```python
-ll.head = ll.reverse()
+ll.reverse()   # not ll.head = ll.reverse()
 ```
 
-Forget the assignment and `head` still refers to the old first node. That node
-is now the last node with `next = None`, so the list silently looks like it has
-one element. Nothing raises. Every node is still there, just unreachable.
+Both conventions are common. Pick one and be consistent — the bug appears when
+a method looks like it mutates but actually returns, or vice versa.
 
-Assigning `self.head = prev` inside the method and returning nothing would
-remove the footgun.
+Empty list and single node both fall out correctly without special cases. Empty
+skips the loop entirely and sets `head = None`; a single node ends with
+`prev` pointing at it and `next` set to `None`.
 
-## Rough edges in the current code
+## Error behaviour
 
-Real bugs in this implementation, worth fixing when you revisit it.
+Every invalid operation raises `IndexError`, never `AttributeError`. An
+`AttributeError: 'NoneType' object has no attribute 'next'` from a linked list
+is almost always a missing bounds check that let a traversal run off the end.
 
-**`insert_at` can raise `AttributeError` instead of `IndexError`.** The `None`
-check sits at the top of the loop body, so it never inspects `current` after
-the final advance. On a 3-element list, `insert_at(4, x)` leaves `current` as
-`None` when the loop exits, and `new_node.next = current.next` crashes with
-`AttributeError: 'NoneType' object has no attribute 'next'`. Same on an empty
-list with any non-zero index. `remove_at` has the guard that fixes this;
-`insert_at` needs the same one after its loop.
+| Call | Result |
+|---|---|
+| `insert_at(n, x)` on length `n` | inserts at the tail, valid |
+| `insert_at(n + 1, x)` on length `n` | `IndexError: index out of range` |
+| `insert_at(k, x)` on empty, `k > 0` | `IndexError: index out of range` |
+| `insert_at(-k, x)` | `IndexError: index cannot be negative` |
+| `remove_at(n - 1)` on length `n` | removes the tail, valid |
+| `remove_at(n)` on length `n` | `IndexError: index out of bound` |
+| `remove_at(k)` on empty | `IndexError: cannot delete from empty list` |
+| `remove_at(-k)` | `IndexError: index cannot be negative` |
 
-**Negative indices are accepted silently.** `range(index - 1)` with a negative
-`index` is empty, so `insert_at(-5, x)` inserts at position 1 and
-`remove_at(-5)` removes it. Should raise.
+The asymmetry between the two is not a mistake. `insert_at` accepts `n` because
+inserting *after* the last element is meaningful; `remove_at` stops at `n - 1`
+because there is no element at `n` to remove.
 
-**`print` shadows the builtin** inside the class body. It works here because the
-call inside the method resolves to the global builtin, not the method, but it
-is a name worth avoiding. `display` or `__str__` is safer.
+## Remaining rough edge
 
-**`ReverseLinkedList.__init__` re-declares `self.head = None`** instead of
-calling `super().__init__()`. Harmless now, but it diverges the moment the base
-class initialises anything else.
+**`print` shadows the builtin** inside the class body. It works — the call
+inside the method resolves to the global builtin rather than the method,
+because the class body is not an enclosing scope for name lookup at runtime —
+but it is a name worth avoiding. `display`, or a `__str__` that returns the
+string instead of printing it, is safer and composes better.
 
 ## Complexity
 
@@ -402,7 +457,12 @@ when it is about indexing.
   node. Use the second when you need to attach something.
 - Position 0 always needs its own branch, because `head` is the pointer being
   modified.
-- If a method returns a new head, assign it.
+- Bounds-check after the walk, not only during it. The final advance is the one
+  that runs off the end.
+- `range(index - 1)` is empty for negative input, so a missing negative guard
+  fails silently instead of raising.
+- A reversal is not finished until `head` moves. Mutate in place, or assign the
+  returned head — but know which one the method does.
 
 ## Problems
 

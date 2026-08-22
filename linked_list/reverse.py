@@ -2,9 +2,9 @@ from linked_list.linked_list import LinkedList
 
 class ReverseLinkedList(LinkedList):
     def __init__(self):
-        self.head = None
-   
-   
+        super().__init__()
+
+
     def reverse(self):
         prev = None
         current = self.head
@@ -13,7 +13,7 @@ class ReverseLinkedList(LinkedList):
             current.next = prev
             prev = current
             current = next_node
-        return prev
+        self.head = prev
     
 
 ll = ReverseLinkedList()
@@ -23,5 +23,5 @@ ll.append(3)
 
 ll.print()
 count = ll.count()
-ll.head = ll.reverse()
+ll.reverse()
 ll.print()

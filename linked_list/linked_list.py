@@ -36,6 +36,9 @@ class LinkedList:
         print("None")
 
     def insert_at(self, index, value):
+        if index < 0:
+            raise IndexError('index cannot be negative')
+
         new_node = Node(value)
 
         if index == 0:
@@ -48,10 +51,17 @@ class LinkedList:
             if current is None:
                 raise IndexError('index out of range')
             current = current.next
+
+        if current is None:
+            raise IndexError('index out of range')
+
         new_node.next = current.next
         current.next = new_node
     
     def remove_at(self,index):
+        if index < 0:
+            raise IndexError("index cannot be negative")
+
         if self.head is None:
             raise IndexError("cannot delete from empty list")
 
