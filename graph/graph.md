@@ -435,3 +435,12 @@ twice in an undirected graph (once from each end), which is still O(E).
 - LeetCode 261, Graph Valid Tree (connected and no cycle)
 - LeetCode 207, Course Schedule (DFS cycle detection, directed graph)
 - LeetCode 797, All Paths From Source to Target (DFS)
+
+
+# 4 directions
+D = [0, 1, 0, -1, 0]
+DIRS = [(D[i], D[i + 1]) for i in range(4)]
+# [(0,1), (1,0), (0,-1), (-1,0)]
+
+# 8 directions
+DIRS8 = [(dr, dc) for dr in (-1, 0, 1) for dc in (-1, 0, 1) if (dr, dc) != (0, 0)]

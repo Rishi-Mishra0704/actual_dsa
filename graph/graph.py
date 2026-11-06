@@ -4,39 +4,57 @@ from stack_queue.stack import Stack
 
 
 def bfs(adj, start):
+    # 1. visited list, all False
     visited = [False] * len(adj)
-    ans = []  # nodes in the order they are visited
+    # 2. visit order
+    ans = []
 
+    # 3. queue with start
     q = Queue()
     q.push(start)
+    # 4. mark start visited
     visited[start] = True
 
+    # 5. loop until queue is empty
     while q.size() > 0:
-        node = q.pop()  # oldest node, from the front
+        # 6. take the oldest node, append to answer
+        node = q.pop()
         ans.append(node)
+        # 7. check each neighbour
         for x in adj[node]:
             if not visited[x]:
-                visited[x] = True  # mark when queued so x is never queued twice
+                # 8. mark on push so it's never queued twice
+                visited[x] = True
                 q.push(x)
+    # 9. return the order
     return ans
 
 
 def dfs(adj, start):
+    # 1. visited list, all False
     visited = [False] * len(adj)
-    ans = []  # nodes in the order they are visited
+    # 2. visit order
+    ans = []
 
+    # 3. stack with start
     stack = Stack()
     stack.push(start)
 
+    # 4. loop until stack is empty
     while stack.size() > 0:
-        node = stack.pop()  # newest node, from the top
+        # 5. take the newest node
+        node = stack.pop()
+        # 6. skip if already visited (can be pushed twice)
         if visited[node]:
-            continue  # a node can be pushed more than once; skip repeats
-        visited[node] = True  # mark when popped, so the order follows the depth
+            continue
+        # 7. mark on pop so order follows depth
+        visited[node] = True
         ans.append(node)
-        for x in reversed(adj[node]):  # reversed so the first neighbour is popped first
+        # 8. push neighbours reversed so the first is popped first
+        for x in reversed(adj[node]):
             if not visited[x]:
                 stack.push(x)
+    # 9. return the order
     return ans
 
 
